@@ -11,4 +11,5 @@ app.get("/", (req, res) => {
   res.send("API funcionando");
 });
 
-app.listen(3000, () => console.log("API escuchando en http://localhost:3000"));
+const PORT = Number(process.env.PORT) || 3000;
+app.listen(PORT, () => console.log(`API escuchando en http://localhost:${PORT}`));
