@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "npx nodemon --watch src --ext ts,json --exec \"npx tsx\" src/index.ts",
     "dev": "tsx watch src/index.ts"
   },
