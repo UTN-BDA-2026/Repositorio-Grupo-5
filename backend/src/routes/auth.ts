@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma.js";
+import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
 
@@ -31,6 +32,10 @@ router.post("/login", async (req, res) => {
     token,
     user: { id: user.id, email: user.email, points: user.points, createdAt: user.createdAt },
   });
+});
+
+router.get("/me", requireAuth, async (req, res) => {
+  return res.json({ user: (req as any).user });
 });
 
 export default router;
