@@ -13,18 +13,17 @@ router.post("/", async (req, res) => {
     });
 
     res.status(201).json(user);
-  } catch (err) {
-    res.status(400).json({ error: "Usuario ya existe o datos inválidos" });
+  } catch (error) {
+    res.status(400).json({ error: "No se pudo crear el usuario" });
   }
 });
 
-// Obtener usuario por ID
+// Obtener usuario
 router.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
 
   const user = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, email: true, points: true },
   });
 
   if (!user) {
