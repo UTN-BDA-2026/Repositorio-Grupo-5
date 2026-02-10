@@ -15,31 +15,30 @@ import adminPaymentsRoutes from "./routes/adminPayments.js";
 
 const app = express();
 
-// ✅ Body parsers (una sola vez)
+// ✅ Parsers (una sola vez)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ✅ CORS (local + Render frontend)
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "https://ecommerce-5bt9.onrender.com", // 👈 tu frontend en Render
-    ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+const corsOptions: cors.CorsOptions = {
+  origin: [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://ecommerce-5bt9.onrender.com", // 👈 tu frontend en Render (cambiá si es otro)
+  ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-// ✅ Preflight
-app.options("*", cors());
+app.use(cors(corsOptions));
+
+// ✅ Preflight SIN "*" (para que no rompa)
+app.options(/.*/, cors(corsOptions));
+
+// ✅ Health
+app.get("/", (_req, res) => res.send("API funcionando"));
 
 // ✅ Routes
-app.get("/", (_req, res) => {
-  res.send("API funcionando");
-});
-
 app.use("/users", usersRoutes);
 app.use("/auth", authRoutes);
 app.use("/products", productsRoutes);
@@ -51,12 +50,12 @@ app.use("/payments", paymentsRoutes);
 app.use("/webhooks", webhooksRoutes);
 app.use("/admin/payments", adminPaymentsRoutes);
 
-// ✅ Simple return URLs (si las usás)
+// ✅ Return URLs
 app.get("/payment/success", (_req, res) => res.send("Pago aprobado ✅"));
 app.get("/payment/failure", (_req, res) => res.send("Pago fallido ❌"));
 app.get("/payment/pending", (_req, res) => res.send("Pago pendiente ⏳"));
 
-// ✅ Port para Render
+// ✅ Port (Render)
 const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`API escuchando en puerto ${PORT}`);
