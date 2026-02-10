@@ -25,6 +25,8 @@ function Nav() {
       <Link to="/products">Products</Link>
       <Link to="/cart">Cart</Link>
       <Link to="/orders">Orders</Link>
+      {!user && <Link to="/register">Register</Link>}
+
 
       <div style={{ marginLeft: "auto" }}>
         {user ? (
@@ -61,7 +63,7 @@ export default function App() {
           <Route path="/products" element={<Products />} />
 
           <Route path="/register" element={<Register />} />
-          
+
           {/* Carrito y órdenes: protegido */}
           <Route
             path="/cart"
