@@ -11,7 +11,7 @@ import AdminRoute from "./routes/AdminRoute";
 import AdminProducts from "./pages/AdminProducts";
 import AdminProductEdit from "./pages/AdminProductEdit";
 import Register from "./pages/Register";
-
+import ProductDetail from "./pages/ProductDetail";
 
 
 function Nav() {
@@ -109,6 +109,8 @@ export default function App() {
               </AdminRoute>
             }
           />
+
+          <Route path="/products/:id" element={<ProductDetail />} />
 
         </Routes>
       </BrowserRouter>

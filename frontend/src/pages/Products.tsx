@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { Link } from "react-router-dom";
 
 type Product = {
   id: number;
@@ -46,6 +47,9 @@ export default function Products() {
         }}
       >
         {products.map((p) => (
+          <Link to={`/products/${p.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+          {
+
           <div
             key={p.id}
             style={{
@@ -98,35 +102,10 @@ export default function Products() {
               {/* ✅ Stock solo para admin */}
               {isAdmin && <> — stock: {p.stock}</>}
             </p>
-
-            <button
-              disabled={p.stock <= 0}
-              style={{
-                marginTop: 10,
-                padding: 10,
-                width: "100%",
-                borderRadius: 10,
-                opacity: p.stock <= 0 ? 0.5 : 1,
-                cursor: p.stock <= 0 ? "not-allowed" : "pointer",
-              }}
-              onClick={async () => {
-                try {
-                  await api.post("/cart", { productId: p.id, quantity: 1 });
-                  alert("✅ Agregado al carrito");
-                } catch (e: any) {
-                  console.log(
-                    "ADD TO CART ERROR:",
-                    e?.response?.status,
-                    e?.response?.data,
-                    e?.message
-                  );
-                  alert(`❌ No se pudo agregar (${e?.response?.status ?? "NETWORK"})`);
-                }
-              }}
-            >
-              {p.stock <= 0 ? "Sin stock" : "Agregar al carrito"}
-            </button>
-          </div>
+            
+          </div>}
+          </Link>
+          
         ))}
       </div>
     </div>

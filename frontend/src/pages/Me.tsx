@@ -135,17 +135,21 @@ export default function Me() {
             </Link>
 
             {user.role === "ADMIN" && (
-              <div
+              <Link
+                to="/admin/products"
                 style={{
+                  display: "block",
                   padding: 12,
                   borderRadius: 10,
-                  border: "1px dashed #666",
-                  opacity: 0.9,
+                  border: "1px solid #444",
+                  textDecoration: "none",
+                  color: "inherit",
                 }}
               >
-                🛠️ Admin disponible (si creás /admin)
-              </div>
+                🛠️ Admin · Productos
+              </Link>
             )}
+
           </div>
 
           <hr style={{ border: 0, borderTop: "1px solid #333", margin: "14px 0" }} />
