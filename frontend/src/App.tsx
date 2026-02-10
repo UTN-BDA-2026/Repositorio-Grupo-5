@@ -10,6 +10,8 @@ import OrderDetail from "./pages/OrderDetail";
 import AdminRoute from "./routes/AdminRoute";
 import AdminProducts from "./pages/AdminProducts";
 import AdminProductEdit from "./pages/AdminProductEdit";
+import Register from "./pages/Register";
+
 
 
 function Nav() {
@@ -58,6 +60,8 @@ export default function App() {
           {/* Productos puede ser público */}
           <Route path="/products" element={<Products />} />
 
+          <Route path="/register" element={<Register />} />
+          
           {/* Carrito y órdenes: protegido */}
           <Route
             path="/cart"

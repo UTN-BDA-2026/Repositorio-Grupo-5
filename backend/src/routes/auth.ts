@@ -6,6 +6,60 @@ import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
 
+// POST /auth/register
+router.post("/register", async (req, res) => {
+  try {
+    const { email, password } = req.body as { email?: string; password?: string };
+
+    if (!email?.trim() || !password) {
+      return res.status(400).json({ error: "email y password son requeridos" });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail.includes("@")) {
+      return res.status(400).json({ error: "email inválido" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: "password muy corta (mínimo 6)" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        email: cleanEmail,
+        password: passwordHash, // ✅ guardamos hash en el campo password
+        role: "USER",
+        points: 0,
+      },
+      select: {
+        id: true,
+        email: true,
+        points: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) return res.status(500).json({ error: "JWT_SECRET no configurado" });
+
+    const token = jwt.sign({ sub: user.id, email: user.email }, secret, {
+      expiresIn: "1h",
+    });
+
+    return res.status(201).json({ token, user });
+  } catch (err: any) {
+    if (err?.code === "P2002") {
+      return res.status(409).json({ error: "Ese email ya está registrado" });
+    }
+    console.error(err);
+    return res.status(500).json({ error: "Error interno" });
+  }
+});
+
 router.post("/login", async (req, res) => {
   const { email, password } = req.body as { email?: string; password?: string };
 
