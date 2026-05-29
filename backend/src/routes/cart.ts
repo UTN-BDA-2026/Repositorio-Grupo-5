@@ -1,61 +1,80 @@
 import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma.js";
+import { redis, cartKey, CART_TTL_SECONDS } from "../db/redis.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
-const router = Router();
+/**
+ * CARRITO EN REDIS
+ * --------------------------------
+ * Key:     cart:{userId}
+ * Tipo:    HASH
+ * Campos:  productId (string) -> quantity (string entero)
+ * TTL:     7 días (se renueva en cada modificación)
+ *
+ * El producto y precio se hidratan desde Postgres (Prisma) al hacer GET.
+ */
 
-// todo /cart requiere auth
+const router = Router();
 router.use(requireAuth);
 
-// GET /cart  -> devuelve items + totales
+// helper: leer el carrito como [{productId, quantity}]
+async function readCart(userId: number) {
+  const raw = await redis.hgetall(cartKey(userId));
+  return Object.entries(raw).map(([productId, quantity]) => ({
+    productId: Number(productId),
+    quantity: Number(quantity),
+  }));
+}
+
+// GET /cart -> items hidratados + total
 router.get("/", async (req, res) => {
-  const userId = (req as any).user?.sub;
+  const userId = Number((req as any).user?.sub);
   if (!userId) return res.status(401).json({ error: "Token inválido" });
 
-  const items = await prisma.cartItem.findMany({
-    where: { userId: Number(userId) },
-    include: {
-      product: {
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          price: true,
-          stock: true,
-          category: { select: { id: true, name: true } },
-        },
-      },
+  const entries = await readCart(userId);
+  if (entries.length === 0) {
+    return res.json({ items: [], total: "0.00" });
+  }
+
+  const productIds = entries.map((e) => e.productId);
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      price: true,
+      stock: true,
+      category: { select: { id: true, name: true } },
     },
-    orderBy: { createdAt: "desc" },
   });
+  const productMap = new Map(products.map((p) => [p.id, p]));
 
   let total = new Prisma.Decimal(0);
+  const items = entries
+    .map((e) => {
+      const product = productMap.get(e.productId);
+      if (!product) return null; // producto borrado; lo ignoramos
+      const unitPrice = product.price;
+      const subtotal = unitPrice.mul(e.quantity);
+      total = total.add(subtotal);
+      return {
+        productId: e.productId,
+        quantity: e.quantity,
+        product,
+        unitPrice: unitPrice.toFixed(2),
+        subtotal: subtotal.toFixed(2),
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 
-  const mapped = items.map((it) => {
-    const unitPrice = it.product.price; // Decimal
-    const subtotal = unitPrice.mul(it.quantity);
-    total = total.add(subtotal);
-
-    return {
-      id: it.id,
-      productId: it.productId,
-      quantity: it.quantity,
-      product: it.product,
-      unitPrice: unitPrice.toFixed(2),
-      subtotal: subtotal.toFixed(2),
-    };
-  });
-
-  res.json({
-    items: mapped,
-    total: total.toFixed(2),
-  });
+  res.json({ items, total: total.toFixed(2) });
 });
 
-// POST /cart  -> agrega (o incrementa) item
+// POST /cart -> agrega (o incrementa) item
 router.post("/", async (req, res) => {
-  const userId = (req as any).user?.sub;
+  const userId = Number((req as any).user?.sub);
   if (!userId) return res.status(401).json({ error: "Token inválido" });
 
   const { productId, quantity } = req.body as { productId?: number; quantity?: number };
@@ -66,25 +85,23 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "quantity debe ser entero > 0" });
   }
 
+  // Validar existencia del producto en Postgres
   const product = await prisma.product.findUnique({
     where: { id: Number(productId) },
     select: { id: true, stock: true },
   });
   if (!product) return res.status(404).json({ error: "Producto no encontrado" });
 
-  // (opcional) validar stock acá, o dejarlo para checkout
-  const item = await prisma.cartItem.upsert({
-    where: { userId_productId: { userId: Number(userId), productId: Number(productId) } },
-    create: { userId: Number(userId), productId: Number(productId), quantity: qty },
-    update: { quantity: { increment: qty } },
-  });
+  const key = cartKey(userId);
+  const newQty = await redis.hincrby(key, String(productId), qty);
+  await redis.expire(key, CART_TTL_SECONDS);
 
-  res.status(201).json(item);
+  res.status(201).json({ productId: Number(productId), quantity: newQty });
 });
 
-// PATCH /cart/:productId -> set cantidad (si 0, borra)
+// PATCH /cart/:productId -> set cantidad (si <=0, borra)
 router.patch("/:productId", async (req, res) => {
-  const userId = (req as any).user?.sub;
+  const userId = Number((req as any).user?.sub);
   if (!userId) return res.status(401).json({ error: "Token inválido" });
 
   const productId = Number(req.params.productId);
@@ -94,47 +111,36 @@ router.patch("/:productId", async (req, res) => {
   if (quantity === undefined) return res.status(400).json({ error: "quantity es requerido" });
   if (!Number.isInteger(quantity)) return res.status(400).json({ error: "quantity debe ser entero" });
 
+  const key = cartKey(userId);
+
   if (quantity <= 0) {
-    await prisma.cartItem.deleteMany({
-      where: { userId: Number(userId), productId },
-    });
+    await redis.hdel(key, String(productId));
     return res.status(204).send();
   }
 
-  try {
-    const updated = await prisma.cartItem.update({
-      where: { userId_productId: { userId: Number(userId), productId } },
-      data: { quantity },
-    });
-    res.json(updated);
-  } catch (err: any) {
-    if (err?.code === "P2025") return res.status(404).json({ error: "Item no encontrado en carrito" });
-    console.error(err);
-    res.status(500).json({ error: "Error interno" });
-  }
+  await redis.hset(key, String(productId), String(quantity));
+  await redis.expire(key, CART_TTL_SECONDS);
+  res.json({ productId, quantity });
 });
 
 // DELETE /cart/:productId -> borrar item
 router.delete("/:productId", async (req, res) => {
-  const userId = (req as any).user?.sub;
+  const userId = Number((req as any).user?.sub);
   if (!userId) return res.status(401).json({ error: "Token inválido" });
 
   const productId = Number(req.params.productId);
   if (!Number.isFinite(productId)) return res.status(400).json({ error: "productId inválido" });
 
-  await prisma.cartItem.deleteMany({
-    where: { userId: Number(userId), productId },
-  });
-
+  await redis.hdel(cartKey(userId), String(productId));
   res.status(204).send();
 });
 
 // DELETE /cart -> vaciar carrito
 router.delete("/", async (req, res) => {
-  const userId = (req as any).user?.sub;
+  const userId = Number((req as any).user?.sub);
   if (!userId) return res.status(401).json({ error: "Token inválido" });
 
-  await prisma.cartItem.deleteMany({ where: { userId: Number(userId) } });
+  await redis.del(cartKey(userId));
   res.status(204).send();
 });
 
