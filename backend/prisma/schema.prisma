@@ -20,8 +20,6 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  cartItems CartItem[]
-
   orders Order[]
 }
 
@@ -46,8 +44,6 @@ model Product {
   categoryId Int?
   category   Category? @relation(fields: [categoryId], references: [id])
 
-  cartItems CartItem[]
-
   orderItems OrderItem[]
 
   // Índices B+Tree: búsqueda por categoría y filtros/orden por precio
@@ -55,20 +51,9 @@ model Product {
   @@index([price])
 }
 
-model CartItem {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  productId Int
-  quantity  Int      @default(1)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, productId])
-  @@index([userId])
-}
+// NOTA: El modelo CartItem se movió a Redis (Bloque 3).
+// Key: cart:{userId}  |  Tipo: HASH (productId -> quantity)  |  TTL: 7 días
+// Ver: backend/src/db/redis.ts y backend/src/routes/cart.ts
 
 enum OrderStatus {
   PENDING
