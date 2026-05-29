@@ -1,0 +1,14 @@
+# Env files (credenciales) — solo se sube .env.example
+.env
+.env.local
+
+# Dependencias del root (si las hay)
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
