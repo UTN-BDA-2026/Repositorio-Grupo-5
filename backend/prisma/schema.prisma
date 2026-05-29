@@ -40,7 +40,7 @@ model Product {
   stock       Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
-  
+
   imageUrl    String?
 
   categoryId Int?
@@ -49,6 +49,10 @@ model Product {
   cartItems CartItem[]
 
   orderItems OrderItem[]
+
+  // Índices B+Tree: búsqueda por categoría y filtros/orden por precio
+  @@index([categoryId])
+  @@index([price])
 }
 
 model CartItem {
@@ -84,6 +88,13 @@ model Order {
   items OrderItem[]
 
   payment Payment?
+
+  // Índice simple B+Tree: buscar órdenes de un usuario
+  @@index([userId])
+  // Índice compuesto: buscar órdenes de un usuario filtradas por estado
+  @@index([userId, status])
+  // Índice compuesto: reportes admin por estado y fecha
+  @@index([status, createdAt])
 }
 
 model OrderItem {
@@ -97,6 +108,10 @@ model OrderItem {
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
+
+  // Índices B+Tree: buscar items de una orden y ventas por producto
+  @@index([orderId])
+  @@index([productId])
 }
 
 enum PaymentProvider {
