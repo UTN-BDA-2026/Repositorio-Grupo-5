@@ -74,6 +74,27 @@ export default function Cart() {
     }
   }
 
+  // Pago local sin MercadoPago (para desarrollo)
+  async function checkoutLocalPay() {
+    if (items.length === 0) return;
+    setCheckingOut(true);
+    try {
+      const orderRes = await api.post("/orders");
+      const orderId = orderRes.data?.id;
+      if (!orderId) { alert("❌ No llegó el id de la orden"); return; }
+
+      await api.post("/payments/local-pay", { orderId });
+
+      setItems([]);
+      navigate(`/orders/${orderId}`);
+    } catch (e: any) {
+      const msg = e?.response?.data?.error ?? "Error al procesar el pago";
+      alert(`❌ ${msg} (${e?.response?.status ?? "NETWORK"})`);
+    } finally {
+      setCheckingOut(false);
+    }
+  }
+
   // ✅ 1 click: crea orden y abre MercadoPago
   async function checkoutAndPay() {
     if (items.length === 0) return;
@@ -178,17 +199,25 @@ export default function Cart() {
 
           <h3 style={{ marginTop: 16 }}>Total: ${computedTotal}</h3>
 
-          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
             <button onClick={clearCart} style={{ padding: 10 }}>
               Vaciar carrito
             </button>
 
             <button
+              onClick={checkoutLocalPay}
+              disabled={checkingOut}
+              style={{ padding: 10, marginLeft: "auto", background: "#2ecc71", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
+            >
+              {checkingOut ? "Procesando..." : "✅ Pagar (local)"}
+            </button>
+
+            <button
               onClick={checkoutAndPay}
               disabled={checkingOut}
-              style={{ padding: 10, marginLeft: "auto" }}
+              style={{ padding: 10 }}
             >
-              {checkingOut ? "Creando orden..." : "Finalizar y pagar"}
+              {checkingOut ? "Creando orden..." : "Pagar con MercadoPago"}
             </button>
           </div>
         </>

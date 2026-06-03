@@ -102,5 +102,43 @@ router.post("/mercadopago/checkout", async (req, res) => {
     sandbox_init_point: data.sandbox_init_point,
   });
 });
-  
+
+// POST /payments/local-pay — pago local sin MercadoPago (solo para desarrollo)
+router.post("/local-pay", async (req, res) => {
+  const userId = Number((req as any).user?.sub);
+  if (!userId) return res.status(401).json({ error: "Token inválido" });
+
+  const { orderId } = req.body as { orderId?: number };
+  if (!orderId) return res.status(400).json({ error: "orderId es requerido" });
+
+  const order = await prisma.order.findUnique({ where: { id: Number(orderId) } });
+  if (!order) return res.status(404).json({ error: "Orden no encontrada" });
+  if (order.userId !== userId) return res.status(403).json({ error: "No autorizado" });
+  if (order.status !== "PENDING") return res.status(409).json({ error: "La orden no está PENDING" });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.order.update({
+      where: { id: order.id },
+      data: { status: "PAID" },
+    });
+    await tx.payment.upsert({
+      where: { orderId: order.id },
+      create: {
+        provider: "MERCADOPAGO",
+        orderId: order.id,
+        status: "approved",
+        amount: order.total,
+        currency: "ARS",
+        paidAt: new Date(),
+      },
+      update: {
+        status: "approved",
+        paidAt: new Date(),
+      },
+    });
+  });
+
+  res.json({ message: "Orden pagada exitosamente", orderId: order.id, status: "PAID" });
+});
+
 export default router;
