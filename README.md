@@ -65,8 +65,38 @@ Si cualquier paso falla, se hace rollback completo.
 ### 3. Backup & Restore
 
 Scripts disponibles en `backend/scripts/`:
-- `backup.sh` — genera un dump de PostgreSQL con `pg_dump`
-- `restore.sh` — restaura desde un dump con `pg_restore`
+
+#### Hacer un backup
+
+```bash
+# Desde la raíz del proyecto (con Docker levantado)
+bash backend/scripts/backup.sh
+```
+
+El archivo se guarda en `backend/scripts/backups/` con el nombre `backup_ecommerce_<fecha_hora>.sql`.
+
+#### Restaurar desde un backup
+
+```bash
+bash backend/scripts/restore.sh backend/scripts/backups/backup_ecommerce_YYYYMMDD_HHMMSS.sql
+```
+
+> El contenedor `ecommerce-postgres` debe estar corriendo antes de ejecutar cualquiera de los dos scripts.
+
+#### Variables de entorno usadas por los scripts
+
+| Variable        | Valor por defecto | Descripción       |
+|-----------------|-------------------|-------------------|
+| `POSTGRES_USER` | `postgres`        | Usuario de la BD  |
+| `POSTGRES_DB`   | `ecommerce`       | Nombre de la base |
+
+Si usás valores distintos en tu `.env`, exportalos antes de correr el script:
+
+```bash
+export POSTGRES_USER=mi_usuario
+export POSTGRES_DB=mi_base
+bash backend/scripts/backup.sh
+```
 
 ### 4. NoSQL — MongoDB + Redis
 
@@ -81,7 +111,28 @@ Scripts disponibles en `backend/scripts/`:
 
 ### 5. Particionado
 
-*(próximamente)*
+Particionado implementado en dos tablas de PostgreSQL:
+
+| Tabla       | Estrategia | Columna     | Particiones                                               |
+|-------------|------------|-------------|-----------------------------------------------------------|
+| `Order`     | LIST       | `status`    | PENDING, PAID, CANCELLED                                  |
+| `OrderItem` | RANGE      | `unitPrice` | low (< $1000), mid ($1000–$10000), high (> $10000)        |
+
+La migración correspondiente está en `backend/prisma/migrations/`.
+
+Para verificar las particiones desde pgAdmin (`http://localhost:8080`):
+
+```sql
+SELECT
+    parent.relname AS tabla_padre,
+    child.relname  AS particion,
+    pg_get_expr(child.relpartbound, child.oid) AS rango
+FROM pg_inherits
+JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
+JOIN pg_class child  ON pg_inherits.inhrelid  = child.oid
+WHERE parent.relname IN ('Order', 'OrderItem')
+ORDER BY parent.relname, child.relname;
+```
 
 ---
 
