@@ -120,6 +120,8 @@ Particionado implementado en dos tablas de PostgreSQL:
 
 La migración correspondiente está en `backend/prisma/migrations/`.
 
+> **Nota técnica:** PostgreSQL no permite foreign keys apuntando a tablas particionadas a menos que la clave referenciada incluya la columna de partición. Por eso las FK de `Payment → Order` y `OrderItem → Order` fueron eliminadas en la migración de particionado. La integridad referencial se mantiene a nivel de aplicación (Prisma valida que el `orderId` exista antes de insertar).
+
 Para verificar las particiones desde pgAdmin (`http://localhost:8080`):
 
 ```sql

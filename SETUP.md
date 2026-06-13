@@ -97,18 +97,47 @@ El comando `prisma migrate deploy` crea todas las tablas e índices en PostgreSQ
 
 ---
 
-## Paso 5 — Iniciar el backend
+## Paso 5 — Cargar datos de prueba (seed)
 
 ```bash
 # Desde la carpeta backend/
-npm run dev
+npx tsx prisma/seed.ts
 ```
 
-El servidor queda disponible en `http://localhost:3000`.
+Esto inserta: 20 categorías, 500 usuarios, 5000 productos, 5000 órdenes y 15000 order items.
 
 ---
 
-## Paso 6 — Verificar que todo funciona
+## Paso 6 — Instalar dependencias del frontend
+
+```bash
+cd ../frontend
+npm install
+```
+
+---
+
+## Paso 7 — Iniciar el backend y el frontend
+
+Abrir **dos terminales**:
+
+**Terminal 1 — Backend:**
+```bash
+cd backend
+npm run dev
+```
+El servidor queda disponible en `http://localhost:3000`.
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+La app queda disponible en `http://localhost:5173`.
+
+---
+
+## Paso 8 — Verificar que todo funciona
 
 ### Backend
 ```
@@ -137,9 +166,13 @@ Respuesta esperada:
 
 ---
 
-## Verificar índices en PostgreSQL
+---
 
-Conectarse a pgAdmin (`http://localhost:8080`) y ejecutar en el Query Tool:
+## Verificar los ítems del proyecto
+
+### 1. Índices
+
+En pgAdmin (`http://localhost:8080`) → Query Tool:
 
 ```sql
 SELECT tablename, indexname, indexdef
@@ -147,6 +180,58 @@ FROM pg_indexes
 WHERE schemaname = 'public'
 ORDER BY tablename, indexname;
 ```
+
+Deberían aparecer 11 índices sobre `Order`, `OrderItem` y `Product`.
+
+### 2. Transacciones
+
+Registrarse en `http://localhost:5173`, agregar productos al carrito y hacer clic en **"✅ Pagar (local)"**. La orden pasa a estado `PAID` en una única transacción atómica.
+
+### 3. Backup & Restore
+
+**En Linux/Mac o Git Bash:**
+```bash
+bash backend/scripts/backup.sh
+bash backend/scripts/restore.sh backend/scripts/backups/backup_ecommerce_<fecha_hora>.sql
+```
+
+**En Windows (PowerShell), si no tenés Git Bash ni WSL:**
+```powershell
+# Backup
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$backupDir = "backend\scripts\backups"
+New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
+docker exec ecommerce-postgres pg_dump -U postgres -d ecommerce --no-password | Out-File -Encoding utf8 "$backupDir\backup_ecommerce_$timestamp.sql"
+Write-Host "Backup guardado en: $backupDir\backup_ecommerce_$timestamp.sql"
+
+# Restore (reemplazar el nombre del archivo)
+Get-Content "backend\scripts\backups\backup_ecommerce_<fecha_hora>.sql" | docker exec -i ecommerce-postgres psql -U postgres -d ecommerce
+```
+
+> **Nota:** el restore está pensado para ejecutarse sobre una base vacía (caso de recuperación ante desastre). Si la base ya tiene datos, aparecen errores de "ya existe" que son esperados — los datos existentes no se modifican. Para un restore limpio, primero hacer `docker compose down -v && docker compose up -d` y luego restaurar el backup sin correr `prisma migrate deploy` ni el seed.
+
+### 4. NoSQL — MongoDB + Redis
+
+- **Redis** (carrito): agregar un producto al carrito y verificar en Redis Commander (`http://localhost:8082`) la clave `cart:{userId}`.
+- **MongoDB** (perfiles): verificar en Mongo Express (`http://localhost:8081`) la colección `userprofiles`.
+
+### 5. Particionado
+
+En pgAdmin → Query Tool:
+
+```sql
+SELECT
+    parent.relname AS tabla_padre,
+    child.relname  AS particion,
+    pg_get_expr(child.relpartbound, child.oid) AS rango
+FROM pg_inherits
+JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
+JOIN pg_class child  ON pg_inherits.inhrelid  = child.oid
+WHERE parent.relname IN ('Order', 'OrderItem')
+ORDER BY parent.relname, child.relname;
+```
+
+Deben aparecer 6 filas: 3 particiones de `Order` (por status) y 3 de `OrderItem` (por rango de precio).
 
 ---
 
