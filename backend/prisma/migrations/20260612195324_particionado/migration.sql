@@ -4,6 +4,17 @@
 -- de la orden: PENDING, PAID o CANCELLED
 -- ============================================================
 
+-- 0) Eliminar foreign keys que apuntan a Order antes de renombrar
+ALTER TABLE "Payment"   DROP CONSTRAINT IF EXISTS "Payment_orderId_fkey";
+ALTER TABLE "OrderItem" DROP CONSTRAINT IF EXISTS "OrderItem_orderId_fkey";
+
+-- 0b) Eliminar índices existentes sobre Order (vienen de la migración de índices)
+DROP INDEX IF EXISTS "Order_userId_idx";
+DROP INDEX IF EXISTS "Order_userId_status_idx";
+DROP INDEX IF EXISTS "Order_status_createdAt_idx";
+DROP INDEX IF EXISTS "Order_createdAt_brin_idx";
+DROP INDEX IF EXISTS "Order_pending_idx";
+
 -- 1) Guardar datos actuales
 ALTER TABLE "Order" RENAME TO "Order_old";
 
@@ -34,11 +45,11 @@ CREATE INDEX IF NOT EXISTS "Order_createdAt_brin_idx"
 CREATE INDEX IF NOT EXISTS "Order_pending_idx"
   ON "Order" ("userId", "createdAt") WHERE status = 'PENDING';
 
--- 6) Recrear foreign keys hacia Order
-ALTER TABLE "Payment" ADD CONSTRAINT "Payment_orderId_fkey"
-  FOREIGN KEY ("orderId") REFERENCES "Order"(id) ON DELETE CASCADE;
+-- Nota: las FK hacia Order (Payment, OrderItem) no se recrean porque
+-- PostgreSQL no permite FK apuntando a tablas particionadas sin incluir
+-- la columna de partición. La integridad se mantiene a nivel de aplicación.
 
--- 7) Eliminar tabla vieja
+-- 6) Eliminar tabla vieja
 DROP TABLE "Order_old";
 
 
@@ -47,6 +58,10 @@ DROP TABLE "Order_old";
 -- Divide OrderItem en 3 particiones según el precio unitario:
 -- low (< $1000), mid ($1000-$10000), high (> $10000)
 -- ============================================================
+
+-- 0) Eliminar índices existentes sobre OrderItem (vienen de la migración de índices)
+DROP INDEX IF EXISTS "OrderItem_orderId_idx";
+DROP INDEX IF EXISTS "OrderItem_productId_idx";
 
 -- 1) Guardar datos actuales
 ALTER TABLE "OrderItem" RENAME TO "OrderItem_old";
@@ -77,9 +92,5 @@ INSERT INTO "OrderItem" SELECT * FROM "OrderItem_old";
 CREATE INDEX "OrderItem_orderId_idx"   ON "OrderItem" ("orderId");
 CREATE INDEX "OrderItem_productId_idx" ON "OrderItem" ("productId");
 
--- 6) Recrear foreign key hacia Order
-ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_orderId_fkey"
-  FOREIGN KEY ("orderId") REFERENCES "Order"(id) ON DELETE CASCADE;
-
--- 7) Eliminar tabla vieja
+-- 6) Eliminar tabla vieja
 DROP TABLE "OrderItem_old";
