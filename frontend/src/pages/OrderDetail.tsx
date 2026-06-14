@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 type OrderStatus = "PENDING" | "PAID" | "CANCELLED";
 
@@ -26,12 +26,17 @@ const money = (v: any) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+function statusBadge(s: OrderStatus) {
+  if (s === "PAID") return <span className="badge badge-success">Pagada</span>;
+  if (s === "PENDING") return <span className="badge badge-warning">Pendiente</span>;
+  return <span className="badge badge-danger">Cancelada</span>;
+}
+
 export default function OrderDetail() {
   const { id } = useParams();
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-
   const intervalRef = useRef<number | null>(null);
 
   async function load() {
@@ -40,137 +45,142 @@ export default function OrderDetail() {
     try {
       const res = await api.get(`/orders/${id}`);
       setOrder(res.data);
-    } catch (e: any) {
-      console.log("LOAD ORDER DETAIL ERROR:", e?.response?.status, e?.response?.data, e?.message);
+    } catch {
       setError("No pude cargar el detalle");
     } finally {
       setRefreshing(false);
     }
   }
 
-  // Carga inicial
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Polling mientras esté PENDING
   useEffect(() => {
-    // limpiar intervalo anterior si existía
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-
     if (!order) return;
-
     if (order.status === "PENDING") {
       intervalRef.current = window.setInterval(() => {
-        // refresca cada 3s
-        api
-          .get(`/orders/${id}`)
-          .then((res) => {
-            setOrder(res.data);
-          })
-          .catch((e) => {
-            console.log("POLL ERROR:", e?.response?.status, e?.response?.data, e?.message);
-          });
+        api.get(`/orders/${id}`).then((res) => setOrder(res.data)).catch(() => {});
       }, 3000);
     }
-
-    // cleanup
     return () => {
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
-  }, [order?.status, id]); // 👈 se reconfigura cuando cambia el status
+  }, [order?.status, id]);
 
-  const computedTotal = useMemo(() => {
-    if (!order) return 0;
-    return order.items.reduce((acc, it) => acc + money(it.subtotal), 0);
-  }, [order]);
+  const computedTotal = useMemo(
+    () => (order ? order.items.reduce((acc, it) => acc + money(it.subtotal), 0) : 0),
+    [order]
+  );
 
   if (error) {
     return (
-      <div style={{ padding: 20, fontFamily: "sans-serif" }}>
-        <h2>Detalle orden #{id}</h2>
-        <p>❌ {error}</p>
-        <button onClick={load} style={{ padding: 10, marginTop: 10 }}>
-          Reintentar
-        </button>
+      <div className="container page">
+        <div className="empty">
+          <div className="empty-icon">❌</div>
+          <p style={{ marginBottom: 16 }}>{error}</p>
+          <button onClick={load} className="btn btn-primary">Reintentar</button>
+        </div>
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div style={{ padding: 20, fontFamily: "sans-serif" }}>
-        <h2>Detalle orden #{id}</h2>
-        <p>Cargando...</p>
+      <div className="container page">
+        <div className="empty">
+          <div className="empty-icon">⏳</div>
+          <p>Cargando orden...</p>
+        </div>
       </div>
     );
   }
 
-  const statusText =
-    order.status === "PENDING"
-      ? "⏳ PENDING (esperando pago...)"
-      : order.status === "PAID"
-      ? "✅ PAID (pagada)"
-      : "❌ CANCELLED (cancelada)";
-
   return (
-    <div style={{ padding: 20, fontFamily: "sans-serif" }}>
-      <h2>Detalle orden #{order.id}</h2>
+    <div className="container page">
+      <Link to="/orders" className="muted" style={{ display: "inline-block", marginBottom: 16, fontSize: 14 }}>
+        ← Volver a órdenes
+      </Link>
 
-      <div style={{ border: "1px solid #444", borderRadius: 8, padding: 12, marginTop: 10 }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <b>Estado</b>
-          <span>{statusText}</span>
+      <div className="row-between" style={{ marginBottom: 24 }}>
+        <div className="stack">
+          <span className="title-eyebrow">Orden <span className="mono">#{order.id}</span></span>
+          <h1 className="h1">Detalle de compra</h1>
         </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, opacity: 0.9 }}>
-          <span>Fecha</span>
-          <span>{new Date(order.createdAt).toLocaleString()}</span>
+        <div className="row" style={{ gap: 12 }}>
+          {statusBadge(order.status)}
+          <button className="btn btn-ghost btn-sm" onClick={load} disabled={refreshing}>
+            {refreshing ? "Recargando..." : "Recargar"}
+          </button>
         </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-          <b>Total (DB)</b>
-          <b>${money(order.total)}</b>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, opacity: 0.9 }}>
-          <span>Total (calculado)</span>
-          <span>${computedTotal}</span>
-        </div>
-
-        {order.status === "PENDING" && (
-          <p style={{ marginTop: 10, opacity: 0.85 }}>
-            Se actualizará automáticamente cuando el webhook confirme el pago.
-          </p>
-        )}
       </div>
 
-      <h3 style={{ marginTop: 16 }}>Items</h3>
-      <div style={{ display: "grid", gap: 10 }}>
-        {order.items.map((it) => (
-          <div key={it.id} style={{ border: "1px solid #444", borderRadius: 8, padding: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-              <b>{it.product?.name ?? `Producto ${it.productId}`}</b>
-              <span>${money(it.unitPrice)}</span>
-            </div>
-            <div style={{ marginTop: 6, opacity: 0.9 }}>Cantidad: {it.quantity}</div>
-            <div style={{ marginTop: 6 }}>
-              Subtotal: <b>${money(it.subtotal)}</b>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 32 }}>
+        <div className="stack-lg">
+          <div className="card">
+            <h3 className="h3" style={{ marginBottom: 16 }}>Items</h3>
+            <div className="stack-lg">
+              {order.items.map((it) => (
+                <div key={it.id} className="row-between" style={{ paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
+                  <div className="stack" style={{ gap: 4 }}>
+                    <span style={{ fontWeight: 500 }}>{it.product?.name ?? `Producto #${it.productId}`}</span>
+                    <span className="muted" style={{ fontSize: 13 }}>
+                      ${money(it.unitPrice).toLocaleString("es-AR")} × {it.quantity}
+                    </span>
+                  </div>
+                  <span style={{ fontWeight: 600 }}>${money(it.subtotal).toLocaleString("es-AR")}</span>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
 
-      <button onClick={load} style={{ marginTop: 12, padding: 10 }} disabled={refreshing}>
-        {refreshing ? "Recargando..." : "Recargar"}
-      </button>
+          {order.status === "PENDING" && (
+            <div className="alert alert-info">
+              Esta orden está esperando confirmación de pago. Se actualizará automáticamente.
+            </div>
+          )}
+        </div>
+
+        <aside>
+          <div className="card stack-lg" style={{ position: "sticky", top: 80 }}>
+            <h3 className="h3">Resumen</h3>
+            <div className="stack" style={{ gap: 8 }}>
+              <div className="row-between">
+                <span className="muted">Fecha</span>
+                <span style={{ fontSize: 13 }}>
+                  {new Date(order.createdAt).toLocaleDateString("es-AR")}
+                </span>
+              </div>
+              <div className="row-between">
+                <span className="muted">Items</span>
+                <span>{order.items.length}</span>
+              </div>
+              <div className="row-between">
+                <span className="muted">Estado</span>
+                {statusBadge(order.status)}
+              </div>
+            </div>
+            <div className="divider" />
+            <div className="row-between" style={{ fontSize: 18, fontWeight: 700 }}>
+              <span>Total</span>
+              <span>${money(order.total).toLocaleString("es-AR")}</span>
+            </div>
+            {Math.abs(computedTotal - money(order.total)) > 0.01 && (
+              <div className="muted" style={{ fontSize: 12 }}>
+                Calculado por items: ${computedTotal.toLocaleString("es-AR")}
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 type AnyCartItem = any;
 
@@ -19,6 +19,7 @@ export default function Cart() {
   const navigate = useNavigate();
   const [items, setItems] = useState<AnyCartItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
 
   async function loadCart() {
@@ -26,9 +27,10 @@ export default function Cart() {
     try {
       const res = await api.get("/cart");
       setItems(normalizeItems(res.data));
-    } catch (e: any) {
-      console.log("LOAD CART ERROR:", e?.response?.status, e?.response?.data, e?.message);
+    } catch {
       setError("No pude cargar el carrito");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -36,21 +38,22 @@ export default function Cart() {
     loadCart();
   }, []);
 
-  const computedTotal = useMemo(() => {
-    return items.reduce((acc, it) => {
-      const qty = toNumber(it.quantity);
-      const price = toNumber(it.product?.price ?? it.price);
-      return acc + qty * price;
-    }, 0);
-  }, [items]);
+  const total = useMemo(
+    () =>
+      items.reduce(
+        (acc, it) =>
+          acc + toNumber(it.quantity) * toNumber(it.product?.price ?? it.price),
+        0
+      ),
+    [items]
+  );
 
   async function setQuantity(productId: number, quantity: number) {
     try {
       await api.patch(`/cart/${productId}`, { quantity });
       await loadCart();
     } catch (e: any) {
-      console.log("SET QTY ERROR:", e?.response?.status, e?.response?.data, e?.message);
-      alert(`❌ No se pudo actualizar (${e?.response?.status ?? "NETWORK"})`);
+      alert(`❌ No se pudo actualizar (${e?.response?.status ?? "error"})`);
     }
   }
 
@@ -59,173 +62,229 @@ export default function Cart() {
       await api.delete(`/cart/${productId}`);
       await loadCart();
     } catch (e: any) {
-      console.log("REMOVE ITEM ERROR:", e?.response?.status, e?.response?.data, e?.message);
-      alert(`❌ No se pudo borrar (${e?.response?.status ?? "NETWORK"})`);
+      alert(`❌ No se pudo borrar (${e?.response?.status ?? "error"})`);
     }
   }
 
   async function clearCart() {
+    if (!confirm("¿Vaciar el carrito?")) return;
     try {
       await api.delete("/cart");
       await loadCart();
     } catch (e: any) {
-      console.log("CLEAR CART ERROR:", e?.response?.status, e?.response?.data, e?.message);
-      alert(`❌ No se pudo vaciar (${e?.response?.status ?? "NETWORK"})`);
+      alert(`❌ No se pudo vaciar (${e?.response?.status ?? "error"})`);
     }
   }
 
-  // Pago local sin MercadoPago (para desarrollo)
   async function checkoutLocalPay() {
     if (items.length === 0) return;
     setCheckingOut(true);
     try {
       const orderRes = await api.post("/orders");
       const orderId = orderRes.data?.id;
-      if (!orderId) { alert("❌ No llegó el id de la orden"); return; }
+      if (!orderId) return alert("❌ No llegó el id de la orden");
 
       await api.post("/payments/local-pay", { orderId });
-
       setItems([]);
       navigate(`/orders/${orderId}`);
     } catch (e: any) {
       const msg = e?.response?.data?.error ?? "Error al procesar el pago";
-      alert(`❌ ${msg} (${e?.response?.status ?? "NETWORK"})`);
+      alert(`❌ ${msg}`);
     } finally {
       setCheckingOut(false);
     }
   }
 
-  // ✅ 1 click: crea orden y abre MercadoPago
   async function checkoutAndPay() {
     if (items.length === 0) return;
-
     setCheckingOut(true);
     try {
-      // 1) crear orden desde el carrito
       const orderRes = await api.post("/orders");
       const orderId = orderRes.data?.id;
+      if (!orderId) return alert("❌ No llegó el id de la orden");
 
-      if (!orderId) {
-        alert("❌ No llegó el id de la orden");
-        return;
-      }
-
-      // 2) pedir link de MercadoPago
       const payRes = await api.post("/payments/mercadopago/checkout", { orderId });
-
       const url = payRes.data?.init_point || payRes.data?.sandbox_init_point;
       if (!url) {
-        alert("❌ No llegó init_point/sandbox_init_point de MercadoPago");
-        // igual te mando al detalle, la orden quedó creada
+        alert("❌ No llegó init_point de MercadoPago");
         navigate(`/orders/${orderId}`);
         return;
       }
-
-      // 3) UX: vaciar UI + ir al detalle de la orden
       setItems([]);
       navigate(`/orders/${orderId}`);
-
-      // 4) abrir MP (si el popup se bloquea, cae en la misma pestaña)
       const win = window.open(url, "_blank");
       if (!win) window.location.href = url;
     } catch (e: any) {
-      console.log("CHECKOUT+PAY ERROR:", e?.response?.status, e?.response?.data, e?.message);
-      const msg = e?.response?.data?.error ?? "No se pudo crear la orden / iniciar pago";
-      alert(`❌ ${msg} (${e?.response?.status ?? "NETWORK"})`);
+      const msg = e?.response?.data?.error ?? "No se pudo iniciar el pago";
+      alert(`❌ ${msg}`);
     } finally {
       setCheckingOut(false);
     }
   }
 
+  if (loading) {
+    return (
+      <div className="container page">
+        <div className="empty">
+          <div className="empty-icon">⏳</div>
+          <p>Cargando carrito...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ padding: 20, fontFamily: "sans-serif" }}>
-      <h2>Carrito</h2>
-      {error && <p>❌ {error}</p>}
+    <div className="container page">
+      <div className="row-between" style={{ marginBottom: 24 }}>
+        <div className="stack">
+          <span className="title-eyebrow">Tu pedido</span>
+          <h1 className="h1">Carrito</h1>
+        </div>
+        {items.length > 0 && (
+          <button className="btn btn-ghost btn-sm" onClick={clearCart}>
+            Vaciar carrito
+          </button>
+        )}
+      </div>
+
+      {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
 
       {items.length === 0 ? (
-        <p>Carrito vacío</p>
+        <div className="empty">
+          <div className="empty-icon">🛒</div>
+          <p style={{ marginBottom: 16 }}>Tu carrito está vacío</p>
+          <Link to="/products" className="btn btn-primary">
+            Ver productos
+          </Link>
+        </div>
       ) : (
-        <>
-          <div style={{ display: "grid", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 32 }}>
+          {/* ITEMS */}
+          <div className="stack-lg">
             {items.map((it) => {
               const productId = toNumber(it.productId ?? it.product?.id);
               const name = it.product?.name ?? it.name ?? `Producto ${productId}`;
+              const image = it.product?.imageUrl ?? it.imageUrl;
+              const category = it.product?.category?.name;
               const price = toNumber(it.product?.price ?? it.price);
               const stock = toNumber(it.product?.stock ?? it.stock);
               const qty = toNumber(it.quantity);
+              const subtotal = price * qty;
 
               return (
                 <div
-                  key={`${productId}`}
-                  style={{ border: "1px solid #444", borderRadius: 8, padding: 12 }}
+                  key={productId}
+                  className="card"
+                  style={{ display: "grid", gridTemplateColumns: "100px 1fr auto", gap: 16, alignItems: "center" }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <b>{name}</b>
-                    <span>${price}</span>
+                  {/* IMG */}
+                  <div
+                    style={{
+                      width: 100,
+                      height: 100,
+                      background: "var(--surface-2)",
+                      borderRadius: "var(--r-md)",
+                      overflow: "hidden",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {image ? (
+                      <img src={image} alt={name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 8 }} />
+                    ) : (
+                      <span style={{ fontSize: 28, opacity: 0.4 }}>📦</span>
+                    )}
                   </div>
 
-                  <div style={{ marginTop: 6, opacity: 0.9 }}>
-                    Cantidad: <b>{qty}</b> {stock ? `(stock: ${stock})` : ""}
+                  {/* INFO */}
+                  <div className="stack" style={{ gap: 6 }}>
+                    {category && (
+                      <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)", fontWeight: 500 }}>
+                        {category}
+                      </span>
+                    )}
+                    <Link to={`/products/${productId}`} style={{ color: "var(--text)", fontWeight: 500, fontSize: 15 }}>
+                      {name}
+                    </Link>
+                    <div className="muted" style={{ fontSize: 13 }}>
+                      ${price.toLocaleString("es-AR")} c/u
+                    </div>
+
+                    <div className="row" style={{ gap: 8, marginTop: 6 }}>
+                      <div className="row" style={{ gap: 0, border: "1px solid var(--border)", borderRadius: "var(--r-md)", overflow: "hidden" }}>
+                        <button
+                          onClick={() => setQuantity(productId, Math.max(1, qty - 1))}
+                          disabled={qty <= 1}
+                          className="btn-ghost"
+                          style={{ width: 32, height: 32, border: "none", background: "transparent", cursor: qty <= 1 ? "not-allowed" : "pointer", opacity: qty <= 1 ? 0.4 : 1 }}
+                        >
+                          −
+                        </button>
+                        <span style={{ minWidth: 32, textAlign: "center", fontWeight: 500, fontSize: 14 }}>{qty}</span>
+                        <button
+                          onClick={() => setQuantity(productId, qty + 1)}
+                          disabled={stock > 0 ? qty >= stock : false}
+                          className="btn-ghost"
+                          style={{ width: 32, height: 32, border: "none", background: "transparent", cursor: stock > 0 && qty >= stock ? "not-allowed" : "pointer", opacity: stock > 0 && qty >= stock ? 0.4 : 1 }}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button onClick={() => removeItem(productId)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>
+                        Quitar
+                      </button>
+                    </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                    <button
-                      onClick={() => setQuantity(productId, Math.max(1, qty - 1))}
-                      disabled={qty <= 1}
-                      style={{ padding: 8 }}
-                    >
-                      -
-                    </button>
-
-                    <button
-                      onClick={() => setQuantity(productId, qty + 1)}
-                      disabled={stock > 0 ? qty >= stock : false}
-                      style={{ padding: 8 }}
-                    >
-                      +
-                    </button>
-
-                    <button
-                      onClick={() => removeItem(productId)}
-                      style={{ padding: 8, marginLeft: "auto" }}
-                    >
-                      Quitar
-                    </button>
+                  {/* SUBTOTAL */}
+                  <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text)" }}>
+                    ${subtotal.toLocaleString("es-AR")}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          <h3 style={{ marginTop: 16 }}>Total: ${computedTotal}</h3>
+          {/* SUMMARY */}
+          <aside>
+            <div className="card stack-lg" style={{ position: "sticky", top: 80 }}>
+              <h3 className="h3">Resumen</h3>
 
-          <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-            <button onClick={clearCart} style={{ padding: 10 }}>
-              Vaciar carrito
-            </button>
+              <div className="row-between">
+                <span className="muted">Subtotal</span>
+                <span>${total.toLocaleString("es-AR")}</span>
+              </div>
+              <div className="row-between">
+                <span className="muted">Envío</span>
+                <span className="muted">A coordinar</span>
+              </div>
+              <div className="divider" />
+              <div className="row-between" style={{ fontSize: 18, fontWeight: 700 }}>
+                <span>Total</span>
+                <span>${total.toLocaleString("es-AR")}</span>
+              </div>
 
-            <button
-              onClick={checkoutLocalPay}
-              disabled={checkingOut}
-              style={{ padding: 10, marginLeft: "auto", background: "#2ecc71", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}
-            >
-              {checkingOut ? "Procesando..." : "✅ Pagar (local)"}
-            </button>
-
-            <button
-              onClick={checkoutAndPay}
-              disabled={checkingOut}
-              style={{ padding: 10 }}
-            >
-              {checkingOut ? "Creando orden..." : "Pagar con MercadoPago"}
-            </button>
-          </div>
-        </>
+              <div className="stack" style={{ gap: 10 }}>
+                <button
+                  onClick={checkoutLocalPay}
+                  disabled={checkingOut}
+                  className="btn btn-primary btn-block btn-lg"
+                >
+                  {checkingOut ? "Procesando..." : "Pagar (local)"}
+                </button>
+                <button
+                  onClick={checkoutAndPay}
+                  disabled={checkingOut}
+                  className="btn btn-secondary btn-block"
+                >
+                  {checkingOut ? "Creando orden..." : "Pagar con MercadoPago"}
+                </button>
+              </div>
+            </div>
+          </aside>
+        </div>
       )}
-
-      <button onClick={loadCart} style={{ marginTop: 12, padding: 10 }}>
-        Recargar carrito
-      </button>
     </div>
   );
 }

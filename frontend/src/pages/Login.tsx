@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Login() {
   const { login, user, logout } = useAuth();
@@ -8,75 +8,96 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    setMsg(null);
-
+    setError(null);
+    setLoading(true);
     try {
       await login(email, password);
-      setMsg("✅ Login OK");
-      navigate("/me");
+      navigate("/products");
     } catch {
-      setMsg("❌ Error de login");
+      setError("Email o contraseña incorrectos");
+    } finally {
+      setLoading(false);
     }
   }
 
-  // ✅ ESTO VA ACÁ (antes del return del form)
   if (user) {
     return (
-      <div style={{ maxWidth: 360, margin: "40px auto", fontFamily: "sans-serif" }}>
-        <h2>Login</h2>
-        <p>
-          Ya estás logueado como <b>{user.email}</b>
-        </p>
-
-        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <button
-            onClick={() => navigate("/me")}
-            style={{ flex: 1, padding: 10 }}
-          >
-            Ir a Me
-          </button>
-
-          <button
-            onClick={logout}
-            style={{ flex: 1, padding: 10 }}
-          >
-            Logout
-          </button>
+      <div className="container page">
+        <div style={{ maxWidth: 420, margin: "0 auto" }}>
+          <div className="card stack-lg">
+            <div className="stack">
+              <span className="title-eyebrow">Sesión activa</span>
+              <h1 className="h2">Ya estás logueado</h1>
+              <p className="muted">como <b>{user.email}</b></p>
+            </div>
+            <div className="row" style={{ gap: 10 }}>
+              <button className="btn btn-primary" onClick={() => navigate("/me")}>
+                Ir a mi cuenta
+              </button>
+              <button className="btn btn-secondary" onClick={logout}>
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-
   return (
-    <div style={{ maxWidth: 360, margin: "40px auto", fontFamily: "sans-serif" }}>
-      <h2>Login</h2>
+    <div className="container page">
+      <div style={{ maxWidth: 420, margin: "0 auto" }}>
+        <div className="card stack-lg">
+          <div className="stack">
+            <span className="title-eyebrow">Bienvenido</span>
+            <h1 className="h2">Iniciar sesión</h1>
+            <p className="muted">Ingresá con tu cuenta para seguir comprando</p>
+          </div>
 
-      <form onSubmit={handleLogin}>
-        <input
-          placeholder="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ width: "100%", padding: 10, marginBottom: 10 }}
-        />
+          <form onSubmit={handleLogin} className="stack-lg">
+            <div className="field">
+              <label className="label" htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                className="input"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
 
-        <input
-          placeholder="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ width: "100%", padding: 10, marginBottom: 10 }}
-        />
+            <div className="field">
+              <label className="label" htmlFor="password">Contraseña</label>
+              <input
+                id="password"
+                type="password"
+                className="input"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
 
-        <button style={{ width: "100%", padding: 10 }}>Entrar</button>
-      </form>
+            {error && <div className="alert alert-error">{error}</div>}
 
-      {msg && <p>{msg}</p>}
+            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+              {loading ? "Ingresando..." : "Entrar"}
+            </button>
+          </form>
+
+          <p className="muted" style={{ textAlign: "center", fontSize: 14 }}>
+            ¿No tenés cuenta? <Link to="/register">Registrate</Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

@@ -7,24 +7,15 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setMsg(null);
+    setError(null);
 
-    if (!email.trim() || !password) {
-      setMsg("Completá email y contraseña");
-      return;
-    }
-    if (password.length < 6) {
-      setMsg("La contraseña debe tener mínimo 6 caracteres");
-      return;
-    }
-    if (password !== password2) {
-      setMsg("Las contraseñas no coinciden");
-      return;
-    }
+    if (!email.trim() || !password) return setError("Completá email y contraseña");
+    if (password.length < 6) return setError("La contraseña debe tener mínimo 6 caracteres");
+    if (password !== password2) return setError("Las contraseñas no coinciden");
 
     setLoading(true);
     try {
@@ -35,59 +26,79 @@ export default function Register() {
 
       const token = res.data?.token;
       if (!token) {
-        setMsg("No llegó token del servidor");
+        setError("No llegó token del servidor");
         return;
       }
-
-      // mismo key que venís usando
       localStorage.setItem("token", token);
-
-      // recarga para que AuthContext levante el token y haga /auth/me
-      window.location.href = "/me";
+      window.location.href = "/products";
     } catch (e: any) {
-      console.log("REGISTER ERROR:", e?.response?.status, e?.response?.data, e?.message);
-      setMsg(e?.response?.data?.error ?? "No se pudo registrar");
+      setError(e?.response?.data?.error ?? "No se pudo registrar");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div style={{ padding: 20, fontFamily: "sans-serif", maxWidth: 520 }}>
-      <h2>Crear cuenta</h2>
+    <div className="container page">
+      <div style={{ maxWidth: 420, margin: "0 auto" }}>
+        <div className="card stack-lg">
+          <div className="stack">
+            <span className="title-eyebrow">Nuevo usuario</span>
+            <h1 className="h2">Crear cuenta</h1>
+            <p className="muted">Empezá a comprar en segundos</p>
+          </div>
 
-      <form onSubmit={submit} style={{ display: "grid", gap: 10 }}>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="email"
-          style={{ padding: 10 }}
-        />
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="password"
-          type="password"
-          style={{ padding: 10 }}
-        />
-        <input
-          value={password2}
-          onChange={(e) => setPassword2(e.target.value)}
-          placeholder="repetir password"
-          type="password"
-          style={{ padding: 10 }}
-        />
+          <form onSubmit={submit} className="stack-lg">
+            <div className="field">
+              <label className="label" htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                className="input"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
 
-        <button disabled={loading} style={{ padding: 10 }}>
-          {loading ? "Creando..." : "Registrarme"}
-        </button>
+            <div className="field">
+              <label className="label" htmlFor="password">Contraseña</label>
+              <input
+                id="password"
+                type="password"
+                className="input"
+                placeholder="mínimo 6 caracteres"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
 
-        {msg && <div style={{ opacity: 0.9 }}>{msg}</div>}
+            <div className="field">
+              <label className="label" htmlFor="password2">Repetir contraseña</label>
+              <input
+                id="password2"
+                type="password"
+                className="input"
+                value={password2}
+                onChange={(e) => setPassword2(e.target.value)}
+                required
+              />
+            </div>
 
-        <div style={{ opacity: 0.8 }}>
-          ¿Ya tenés cuenta? <Link to="/">Ir a Login</Link>
+            {error && <div className="alert alert-error">{error}</div>}
+
+            <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>
+              {loading ? "Creando..." : "Crear cuenta"}
+            </button>
+          </form>
+
+          <p className="muted" style={{ textAlign: "center", fontSize: 14 }}>
+            ¿Ya tenés cuenta? <Link to="/">Iniciá sesión</Link>
+          </p>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

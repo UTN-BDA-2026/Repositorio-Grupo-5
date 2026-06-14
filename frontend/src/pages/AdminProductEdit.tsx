@@ -14,24 +14,19 @@ type Product = {
 };
 
 function isValidUrl(s: string) {
-  try {
-    new URL(s);
-    return true;
-  } catch {
-    return false;
-  }
+  try { new URL(s); return true; } catch { return false; }
 }
 
 export default function AdminProductEdit() {
-  const { id } = useParams(); // "new" o número
+  const { id } = useParams();
   const isNew = id === "new";
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  // form
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("0");
@@ -39,79 +34,63 @@ export default function AdminProductEdit() {
   const [categoryId, setCategoryId] = useState<string>("");
   const [imageUrl, setImageUrl] = useState("");
 
-  const previewOk = useMemo(() => imageUrl.trim() !== "" && isValidUrl(imageUrl.trim()), [imageUrl]);
+  const previewOk = useMemo(
+    () => imageUrl.trim() !== "" && isValidUrl(imageUrl.trim()),
+    [imageUrl]
+  );
 
   useEffect(() => {
     if (isNew) return;
-
-    async function load() {
+    (async () => {
       setError(null);
       setLoading(true);
       try {
         const res = await api.get(`/products/${id}`);
         const p: Product = res.data;
-
         setName(p.name ?? "");
         setDescription(p.description ?? "");
         setPrice(String(p.price ?? "0"));
         setStock(String(p.stock ?? 0));
         setCategoryId(p.categoryId == null ? "" : String(p.categoryId));
         setImageUrl(p.imageUrl ?? "");
-      } catch (e: any) {
-        console.log("LOAD PRODUCT ERROR:", e?.response?.status, e?.response?.data, e?.message);
+      } catch {
         setError("No pude cargar el producto");
       } finally {
         setLoading(false);
       }
-    }
-
-    load();
+    })();
   }, [id, isNew]);
 
   async function save() {
     setError(null);
+    setSuccess(null);
 
     const payload: any = {
       name: name.trim(),
       description: description.trim() === "" ? null : description.trim(),
-      price: price, // lo mando como string, prisma Decimal lo acepta
+      price,
       stock: Number(stock),
       categoryId: categoryId.trim() === "" ? null : Number(categoryId),
       imageUrl: imageUrl.trim() === "" ? null : imageUrl.trim(),
     };
 
-    if (!payload.name) {
-      setError("El nombre es requerido");
-      return;
-    }
-    if (!Number.isFinite(Number(payload.price))) {
-      setError("Precio inválido");
-      return;
-    }
-    if (!Number.isFinite(payload.stock) || payload.stock < 0) {
-      setError("Stock inválido (>= 0)");
-      return;
-    }
-    if (payload.categoryId !== null && !Number.isFinite(payload.categoryId)) {
-      setError("categoryId inválido");
-      return;
-    }
+    if (!payload.name) return setError("El nombre es requerido");
+    if (!Number.isFinite(Number(payload.price))) return setError("Precio inválido");
+    if (!Number.isFinite(payload.stock) || payload.stock < 0) return setError("Stock inválido (≥ 0)");
+    if (payload.categoryId !== null && !Number.isFinite(payload.categoryId)) return setError("categoryId inválido");
 
     setSaving(true);
     try {
       if (isNew) {
-        const res = await api.post("/products", payload); // requiere ADMIN
-        const created: Product = res.data;
-        alert("✅ Producto creado");
-        navigate(`/admin/products/${created.id}`);
+        const res = await api.post("/products", payload);
+        navigate(`/admin/products/${res.data.id}`);
       } else {
-        await api.patch(`/products/${id}`, payload); // requiere ADMIN
-        alert("✅ Cambios guardados");
+        await api.patch(`/products/${id}`, payload);
+        setSuccess("Cambios guardados");
       }
     } catch (e: any) {
-      console.log("SAVE PRODUCT ERROR:", e?.response?.status, e?.response?.data, e?.message);
       const msg = e?.response?.data?.error ?? "No se pudo guardar";
-      setError(`${msg} (${e?.response?.status ?? "NETWORK"})`);
+      setError(msg);
     } finally {
       setSaving(false);
     }
@@ -119,146 +98,132 @@ export default function AdminProductEdit() {
 
   if (loading) {
     return (
-      <div style={{ padding: 20, fontFamily: "sans-serif" }}>
-        <h2>Admin · {isNew ? "Nuevo producto" : `Editar producto #${id}`}</h2>
-        <p>Cargando...</p>
+      <div className="container page">
+        <div className="empty">
+          <div className="empty-icon">⏳</div>
+          <p>Cargando producto...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 20, fontFamily: "sans-serif", maxWidth: 900, margin: "0 auto" }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
-        <h2 style={{ margin: 0 }}>Admin · {isNew ? "Nuevo producto" : `Editar producto #${id}`}</h2>
-        <Link to="/admin/products" style={{ color: "inherit" }}>
-          ← Volver
-        </Link>
+    <div className="container page">
+      <Link to="/admin/products" className="muted" style={{ display: "inline-block", marginBottom: 16, fontSize: 14 }}>
+        ← Volver al panel
+      </Link>
+
+      <div className="row-between" style={{ marginBottom: 24 }}>
+        <div className="stack">
+          <span className="title-eyebrow">Admin</span>
+          <h1 className="h1">{isNew ? "Nuevo producto" : `Editar producto #${id}`}</h1>
+        </div>
       </div>
 
-      {error && (
-        <div style={{ marginTop: 12, padding: 10, border: "1px solid #733", borderRadius: 10 }}>
-          ❌ {error}
-        </div>
-      )}
+      {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
+      {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>{success}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 12, marginTop: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 32 }}>
         {/* FORM */}
-        <div style={{ border: "1px solid #444", borderRadius: 12, padding: 14, background: "#0f0f0f" }}>
-          <div style={{ display: "grid", gap: 10 }}>
-            <label>
-              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Nombre</div>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #444" }}
-              />
-            </label>
+        <div className="card stack-lg">
+          <div className="field">
+            <label className="label">Nombre</label>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
 
-            <label>
-              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Descripción</div>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #444" }}
-              />
-            </label>
+          <div className="field">
+            <label className="label">Descripción</label>
+            <textarea
+              className="textarea"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+            />
+          </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <label>
-                <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Precio</div>
-                <input
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #444" }}
-                />
-              </label>
-
-              <label>
-                <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Stock</div>
-                <input
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #444" }}
-                />
-              </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div className="field">
+              <label className="label">Precio</label>
+              <input className="input" value={price} onChange={(e) => setPrice(e.target.value)} />
             </div>
+            <div className="field">
+              <label className="label">Stock</label>
+              <input className="input" value={stock} onChange={(e) => setStock(e.target.value)} />
+            </div>
+          </div>
 
-            <label>
-              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>
-                CategoryId (opcional)
-              </div>
-              <input
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                placeholder="ej: 1"
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #444" }}
-              />
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                Dejalo vacío para “sin categoría”.
-              </div>
-            </label>
+          <div className="field">
+            <label className="label">Category ID (opcional)</label>
+            <input
+              className="input"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              placeholder="ej: 1"
+            />
+            <span className="muted" style={{ fontSize: 12 }}>
+              Dejalo vacío para "sin categoría"
+            </span>
+          </div>
 
-            <label>
-              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 4 }}>Foto (imageUrl)</div>
-              <input
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://.../imagen.jpg"
-                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #444" }}
-              />
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                Pegá un link directo a imagen (.jpg/.png). Si es una página HTML, no se va a ver.
-              </div>
-            </label>
+          <div className="field">
+            <label className="label">URL de imagen</label>
+            <input
+              className="input"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://.../imagen.jpg"
+            />
+            <span className="muted" style={{ fontSize: 12 }}>
+              Link directo a un archivo .jpg/.png
+            </span>
+          </div>
 
-            <button
-              onClick={save}
-              disabled={saving}
-              style={{ padding: 12, borderRadius: 10, border: "1px solid #444" }}
-            >
-              {saving ? "Guardando..." : "Guardar"}
+          <div className="row" style={{ gap: 12 }}>
+            <button onClick={save} disabled={saving} className="btn btn-primary btn-lg">
+              {saving ? "Guardando..." : isNew ? "Crear producto" : "Guardar cambios"}
             </button>
+            <Link to="/admin/products" className="btn btn-ghost">Cancelar</Link>
           </div>
         </div>
 
         {/* PREVIEW */}
-        <div style={{ border: "1px solid #444", borderRadius: 12, padding: 14, background: "#0f0f0f" }}>
-          <div style={{ fontWeight: 800, marginBottom: 10 }}>Preview</div>
-
-          <div
-            style={{
-              height: 220,
-              borderRadius: 12,
-              overflow: "hidden",
-              border: "1px solid #333",
-              background: "#111",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {previewOk ? (
-              <img
-                src={imageUrl.trim()}
-                alt="preview"
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : (
-              <div style={{ opacity: 0.7, padding: 12, textAlign: "center" }}>
-                {imageUrl.trim() === "" ? "Sin foto" : "URL inválida"}
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginTop: 12, opacity: 0.85 }}>
-            <div style={{ fontWeight: 800 }}>{name || "Nombre del producto"}</div>
-            <div style={{ opacity: 0.8, marginTop: 4 }}>
-              ${Number.isFinite(Number(price)) ? Number(price) : 0} · stock:{" "}
-              {Number.isFinite(Number(stock)) ? Number(stock) : 0}
+        <aside>
+          <div className="card stack" style={{ position: "sticky", top: 80 }}>
+            <h3 className="h3">Vista previa</h3>
+            <div
+              style={{
+                aspectRatio: "1 / 1",
+                background: "var(--surface-2)",
+                borderRadius: "var(--r-md)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+              }}
+            >
+              {previewOk ? (
+                <img
+                  src={imageUrl.trim()}
+                  alt="preview"
+                  style={{ width: "100%", height: "100%", objectFit: "contain", padding: 16 }}
+                />
+              ) : (
+                <div className="muted" style={{ fontSize: 13, textAlign: "center" }}>
+                  {imageUrl.trim() === "" ? "Sin imagen" : "URL inválida"}
+                </div>
+              )}
+            </div>
+            <div className="stack" style={{ gap: 4 }}>
+              <span style={{ fontWeight: 500, fontSize: 15 }}>{name || "Nombre del producto"}</span>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>
+                ${(Number.isFinite(Number(price)) ? Number(price) : 0).toLocaleString("es-AR")}
+              </span>
+              <span className="muted" style={{ fontSize: 12 }}>
+                Stock: {Number.isFinite(Number(stock)) ? Number(stock) : 0}
+              </span>
             </div>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   );

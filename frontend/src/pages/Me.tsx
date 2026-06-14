@@ -1,164 +1,143 @@
-import { useMemo } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Link } from "react-router-dom";
 
 function formatDate(s?: string) {
-  if (!s) return "-";
+  if (!s) return "—";
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleString();
+  return d.toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
+}
+
+function initials(email: string) {
+  return email.slice(0, 2).toUpperCase();
 }
 
 export default function Me() {
   const { user } = useAuth();
 
-  const roleLabel = useMemo(() => {
-    if (!user) return "";
-    return user.role === "ADMIN" ? "Administrador" : "Usuario";
-  }, [user]);
-
   if (!user) {
     return (
-      <div style={{ padding: 20, fontFamily: "sans-serif" }}>
-        <h2>Mi perfil</h2>
-        <p>No estás logueado.</p>
-        <Link to="/">Ir a login</Link>
+      <div className="container page">
+        <div className="empty">
+          <div className="empty-icon">🔒</div>
+          <p style={{ marginBottom: 16 }}>No estás logueado</p>
+          <Link to="/" className="btn btn-primary">Iniciar sesión</Link>
+        </div>
       </div>
     );
   }
 
-  const badgeStyle = (kind: "admin" | "user") => ({
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "6px 10px",
-    borderRadius: 999,
-    border: "1px solid #444",
-    background: kind === "admin" ? "#221a00" : "#121212",
-    fontSize: 12,
-    opacity: 0.95,
-  });
-
-  const cardStyle = {
-    border: "1px solid #444",
-    borderRadius: 12,
-    padding: 16,
-    background: "#0f0f0f",
-  } as const;
+  const isAdmin = user.role === "ADMIN";
 
   return (
-    <div style={{ padding: 20, fontFamily: "sans-serif", maxWidth: 900, margin: "0 auto" }}>
-      <h2 style={{ marginBottom: 12 }}>Mi perfil</h2>
+    <div className="container page">
+      <div className="row-between" style={{ marginBottom: 24 }}>
+        <div className="stack">
+          <span className="title-eyebrow">Cuenta</span>
+          <h1 className="h1">Mi perfil</h1>
+        </div>
+      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 12 }}>
-        {/* Perfil */}
-        <div style={cardStyle}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-            <div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Email</div>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>{user.email}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 32 }}>
+        {/* PERFIL */}
+        <div className="card stack-lg">
+          <div className="row" style={{ gap: 20 }}>
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 999,
+                background: "var(--primary)",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 22,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {initials(user.email)}
             </div>
-
-            <span style={user.role === "ADMIN" ? badgeStyle("admin") : badgeStyle("user")}>
-              {user.role === "ADMIN" ? "🛡️" : "👤"} {roleLabel}
-            </span>
+            <div className="stack" style={{ gap: 4 }}>
+              <h2 className="h2">{user.email}</h2>
+              {isAdmin ? (
+                <span className="badge badge-primary">🛡 Administrador</span>
+              ) : (
+                <span className="badge">👤 Usuario</span>
+              )}
+            </div>
           </div>
 
-          <hr style={{ border: 0, borderTop: "1px solid #333", margin: "14px 0" }} />
+          <div className="divider" />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>User ID</div>
-              <div style={{ fontWeight: 600 }}>{user.id}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Puntos</div>
-              <div style={{ fontWeight: 600 }}>{user.points}</div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Creado</div>
-              <div style={{ fontWeight: 600 }}>{formatDate(user.createdAt)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Actualizado</div>
-              <div style={{ fontWeight: 600 }}>{formatDate(user.updatedAt)}</div>
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <DataRow label="User ID" value={String(user.id)} mono />
+            <DataRow label="Puntos" value={String(user.points ?? 0)} />
+            <DataRow label="Creado" value={formatDate(user.createdAt)} />
+            <DataRow label="Actualizado" value={formatDate(user.updatedAt)} />
           </div>
         </div>
 
-        {/* Acciones rápidas */}
-        <div style={cardStyle}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Acciones rápidas</div>
-
-          <div style={{ display: "grid", gap: 10 }}>
-            <Link
-              to="/products"
-              style={{
-                display: "block",
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #444",
-                textDecoration: "none",
-                color: "inherit",
-              }}
-            >
-              🛒 Ver productos
-            </Link>
-
-            <Link
-              to="/orders"
-              style={{
-                display: "block",
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #444",
-                textDecoration: "none",
-                color: "inherit",
-              }}
-            >
-              📦 Mis órdenes
-            </Link>
-
-            <Link
-              to="/cart"
-              style={{
-                display: "block",
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #444",
-                textDecoration: "none",
-                color: "inherit",
-              }}
-            >
-              🧺 Ir al carrito
-            </Link>
-
-            {user.role === "ADMIN" && (
-              <Link
-                to="/admin/products"
-                style={{
-                  display: "block",
-                  padding: 12,
-                  borderRadius: 10,
-                  border: "1px solid #444",
-                  textDecoration: "none",
-                  color: "inherit",
-                }}
-              >
-                🛠️ Admin · Productos
-              </Link>
-            )}
-
-          </div>
-
-          <hr style={{ border: 0, borderTop: "1px solid #333", margin: "14px 0" }} />
-
-          <div style={{ fontSize: 12, opacity: 0.75 }}>
-            Tip: si querés que esto tenga foto/nombre, agregamos esos campos al modelo User y a `/auth/me`.
-          </div>
+        {/* ACCIONES */}
+        <div className="card stack">
+          <h3 className="h3" style={{ marginBottom: 8 }}>Accesos rápidos</h3>
+          <QuickLink to="/products" icon="🛍" title="Catálogo" sub="Explorar productos" />
+          <QuickLink to="/cart" icon="🧺" title="Carrito" sub="Ver lo que vas a comprar" />
+          <QuickLink to="/orders" icon="📦" title="Mis órdenes" sub="Historial de compras" />
+          {isAdmin && (
+            <QuickLink
+              to="/admin/products"
+              icon="🛠"
+              title="Panel Admin"
+              sub="Gestionar productos"
+            />
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+function DataRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="stack" style={{ gap: 4 }}>
+      <span className="muted" style={{ fontSize: 12 }}>{label}</span>
+      <span className={mono ? "mono" : ""} style={{ fontWeight: 500 }}>{value}</span>
+    </div>
+  );
+}
+
+function QuickLink({ to, icon, title, sub }: { to: string; icon: string; title: string; sub: string }) {
+  return (
+    <Link
+      to={to}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: 12,
+        borderRadius: "var(--r-md)",
+        border: "1px solid var(--border)",
+        color: "var(--text)",
+        background: "var(--surface)",
+        transition: "background 0.15s, border-color 0.15s",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLAnchorElement).style.background = "var(--surface-2)";
+        (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--border-strong)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLAnchorElement).style.background = "var(--surface)";
+        (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--border)";
+      }}
+    >
+      <span style={{ fontSize: 22 }}>{icon}</span>
+      <div className="stack" style={{ gap: 2 }}>
+        <span style={{ fontSize: 14, fontWeight: 500 }}>{title}</span>
+        <span className="muted" style={{ fontSize: 12 }}>{sub}</span>
+      </div>
+      <span style={{ marginLeft: "auto", color: "var(--text-faint)" }}>→</span>
+    </Link>
   );
 }

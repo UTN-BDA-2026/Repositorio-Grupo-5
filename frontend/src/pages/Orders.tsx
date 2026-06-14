@@ -19,9 +19,25 @@ function money(v: any) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function statusBadge(status: OrderStatus) {
+  if (status === "PAID") return <span className="badge badge-success">Pagada</span>;
+  if (status === "PENDING") return <span className="badge badge-warning">Pendiente</span>;
+  return <span className="badge badge-danger">Cancelada</span>;
+}
+
+function formatDate(iso: string) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return iso;
+  }
+}
+
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("ALL");
   const [payingId, setPayingId] = useState<number | null>(null);
 
@@ -30,9 +46,10 @@ export default function Orders() {
     try {
       const res = await api.get("/orders");
       setOrders(res.data);
-    } catch (e: any) {
-      console.log("LOAD ORDERS ERROR:", e?.response?.status, e?.response?.data, e?.message);
+    } catch {
       setError("No pude cargar tus órdenes");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -40,14 +57,14 @@ export default function Orders() {
     load();
   }, []);
 
-  const filtered = useMemo(() => {
-    if (filter === "ALL") return orders;
-    return orders.filter((o) => o.status === filter);
-  }, [orders, filter]);
+  const filtered = useMemo(
+    () => (filter === "ALL" ? orders : orders.filter((o) => o.status === filter)),
+    [orders, filter]
+  );
 
   const counts = useMemo(() => {
     const c = { ALL: orders.length, PENDING: 0, PAID: 0, CANCELLED: 0 };
-    for (const o of orders) c[o.status] += 1 as any;
+    for (const o of orders) c[o.status] += 1;
     return c;
   }, [orders]);
 
@@ -55,87 +72,130 @@ export default function Orders() {
     setPayingId(orderId);
     try {
       const res = await api.post("/payments/mercadopago/checkout", { orderId });
-      // MP devuelve init_point (prod) y sandbox_init_point (sandbox)
       const url = res.data?.init_point || res.data?.sandbox_init_point;
-      if (!url) {
-        alert("❌ No llegó init_point de MercadoPago");
-        return;
-      }
+      if (!url) return alert("❌ No llegó init_point de MercadoPago");
       window.open(url, "_blank");
     } catch (e: any) {
-      console.log("PAY ERROR:", e?.response?.status, e?.response?.data, e?.message);
-      alert(`❌ No se pudo iniciar pago (${e?.response?.status ?? "NETWORK"})`);
+      alert(`❌ No se pudo iniciar pago (${e?.response?.status ?? "error"})`);
     } finally {
       setPayingId(null);
     }
   }
 
-  const buttonStyle = (active: boolean) => ({
-    padding: 10,
-    borderRadius: 8,
-    border: "1px solid #444",
-    background: active ? "#222" : "transparent",
-    cursor: "pointer",
-  });
+  if (loading) {
+    return (
+      <div className="container page">
+        <div className="empty">
+          <div className="empty-icon">⏳</div>
+          <p>Cargando órdenes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: 20, fontFamily: "sans-serif" }}>
-      <h2>Mis órdenes</h2>
-      {error && <p>❌ {error}</p>}
-
-      {/* Filtros */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", margin: "12px 0" }}>
-        <button style={buttonStyle(filter === "ALL")} onClick={() => setFilter("ALL")}>
-          Todas ({counts.ALL})
-        </button>
-        <button style={buttonStyle(filter === "PENDING")} onClick={() => setFilter("PENDING")}>
-          Pending ({counts.PENDING})
-        </button>
-        <button style={buttonStyle(filter === "PAID")} onClick={() => setFilter("PAID")}>
-          Paid ({counts.PAID})
-        </button>
-        <button style={buttonStyle(filter === "CANCELLED")} onClick={() => setFilter("CANCELLED")}>
-          Cancelled ({counts.CANCELLED})
-        </button>
-
-        <button onClick={load} style={{ padding: 10, marginLeft: "auto" }}>
+    <div className="container page">
+      <div className="row-between" style={{ marginBottom: 24 }}>
+        <div className="stack">
+          <span className="title-eyebrow">Historial</span>
+          <h1 className="h1">Mis órdenes</h1>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={load}>
           Recargar
         </button>
       </div>
 
+      {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
+
+      {/* FILTROS */}
+      <div className="row" style={{ gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+        <FilterChip label="Todas" count={counts.ALL} active={filter === "ALL"} onClick={() => setFilter("ALL")} />
+        <FilterChip label="Pendientes" count={counts.PENDING} active={filter === "PENDING"} onClick={() => setFilter("PENDING")} />
+        <FilterChip label="Pagadas" count={counts.PAID} active={filter === "PAID"} onClick={() => setFilter("PAID")} />
+        <FilterChip label="Canceladas" count={counts.CANCELLED} active={filter === "CANCELLED"} onClick={() => setFilter("CANCELLED")} />
+      </div>
+
       {filtered.length === 0 ? (
-        <p>No hay órdenes para ese filtro</p>
+        <div className="empty">
+          <div className="empty-icon">📦</div>
+          <p>No hay órdenes para mostrar</p>
+        </div>
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {filtered.map((o) => (
-            <div key={o.id} style={{ border: "1px solid #444", borderRadius: 8, padding: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <b>Orden #{o.id}</b>
-                <span>{o.status}</span>
-              </div>
-
-              <div style={{ marginTop: 6 }}>
-                Total: <b>${money(o.total)}</b> — items: {o.items?.length ?? 0}
-              </div>
-
-              <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center" }}>
-                <Link to={`/orders/${o.id}`}>Ver detalle</Link>
-
-                {/* Botón pagar solo si está pendiente */}
-                {o.status === "PENDING" && (
-                  <button
-                    onClick={() => pay(o.id)}
-                    disabled={payingId === o.id}
-                    style={{ marginLeft: "auto", padding: 8 }}
-                  >
-                    {payingId === o.id ? "Abriendo MercadoPago..." : "Pagar"}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="card-flush">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Orden</th>
+                <th>Fecha</th>
+                <th>Items</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th style={{ textAlign: "right" }}>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((o) => (
+                <tr key={o.id}>
+                  <td><span className="mono">#{o.id}</span></td>
+                  <td className="muted">{formatDate(o.createdAt)}</td>
+                  <td>{o.items?.length ?? 0}</td>
+                  <td style={{ fontWeight: 600 }}>${money(o.total).toLocaleString("es-AR")}</td>
+                  <td>{statusBadge(o.status)}</td>
+                  <td style={{ textAlign: "right" }}>
+                    <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+                      <Link to={`/orders/${o.id}`} className="btn btn-secondary btn-sm">
+                        Ver detalle
+                      </Link>
+                      {o.status === "PENDING" && (
+                        <button
+                          onClick={() => pay(o.id)}
+                          disabled={payingId === o.id}
+                          className="btn btn-primary btn-sm"
+                        >
+                          {payingId === o.id ? "Abriendo..." : "Pagar"}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
+  );
+}
+
+function FilterChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        all: "unset",
+        cursor: "pointer",
+        padding: "8px 14px",
+        borderRadius: 999,
+        fontSize: 13,
+        fontWeight: 500,
+        background: active ? "var(--primary)" : "var(--surface)",
+        color: active ? "#fff" : "var(--text)",
+        border: `1px solid ${active ? "var(--primary)" : "var(--border)"}`,
+        transition: "background 0.15s, color 0.15s",
+      }}
+    >
+      {label}{" "}
+      <span style={{ opacity: 0.7, marginLeft: 4 }}>{count}</span>
+    </button>
   );
 }
