@@ -135,7 +135,7 @@ export default function Cart() {
 
   return (
     <div className="container page">
-      <div className="row-between" style={{ marginBottom: 24 }}>
+      <div className="row-between" style={{ marginBottom: 40 }}>
         <div className="stack">
           <span className="title-eyebrow">Tu pedido</span>
           <h1 className="h1">Carrito</h1>
@@ -158,7 +158,7 @@ export default function Cart() {
           </Link>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 32 }}>
+        <div className="grid-summary">
           {/* ITEMS */}
           <div className="stack-lg">
             {items.map((it) => {

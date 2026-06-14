@@ -113,7 +113,7 @@ export default function AdminProductEdit() {
         ← Volver al panel
       </Link>
 
-      <div className="row-between" style={{ marginBottom: 24 }}>
+      <div className="row-between" style={{ marginBottom: 40 }}>
         <div className="stack">
           <span className="title-eyebrow">Admin</span>
           <h1 className="h1">{isNew ? "Nuevo producto" : `Editar producto #${id}`}</h1>
@@ -123,7 +123,7 @@ export default function AdminProductEdit() {
       {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
       {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>{success}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 32 }}>
+      <div className="grid-summary">
         {/* FORM */}
         <div className="card stack-lg">
           <div className="field">

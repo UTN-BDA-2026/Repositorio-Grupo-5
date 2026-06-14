@@ -2,7 +2,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Link } from "react-router-dom";
 
 function formatDate(s?: string) {
-  if (!s) return "—";
+  if (!s) return "Sin datos";
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return s;
   return d.toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" });
@@ -31,14 +31,14 @@ export default function Me() {
 
   return (
     <div className="container page">
-      <div className="row-between" style={{ marginBottom: 24 }}>
+      <div className="row-between" style={{ marginBottom: 40 }}>
         <div className="stack">
           <span className="title-eyebrow">Cuenta</span>
           <h1 className="h1">Mi perfil</h1>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 32 }}>
+      <div className="grid-summary">
         {/* PERFIL */}
         <div className="card stack-lg">
           <div className="row" style={{ gap: 20 }}>

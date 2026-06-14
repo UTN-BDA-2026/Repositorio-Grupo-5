@@ -89,7 +89,7 @@ export default function ProductDetail() {
         ← Volver al catálogo
       </Link>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40 }}>
+      <div className="grid-detail">
         {/* IMAGE */}
         <div
           className="card-flush"

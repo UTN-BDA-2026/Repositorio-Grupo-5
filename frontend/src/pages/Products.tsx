@@ -64,11 +64,12 @@ export default function Products() {
       <section
         className="stack-lg"
         style={{
-          background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
-          color: "#fff",
-          borderRadius: 16,
-          padding: "48px 40px",
-          marginBottom: 40,
+          background:
+            "linear-gradient(135deg, oklch(53% 0.21 280) 0%, oklch(48% 0.24 305) 100%)",
+          color: "oklch(99% 0.005 270)",
+          borderRadius: 20,
+          padding: "72px 64px",
+          marginBottom: 64,
         }}
       >
         <span
@@ -100,11 +101,11 @@ export default function Products() {
         </p>
       </section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 32 }}>
+      <div className="grid-sidebar">
         {/* SIDEBAR */}
         <aside>
-          <div className="card" style={{ padding: 18, position: "sticky", top: 80 }}>
-            <h3 className="h3" style={{ marginBottom: 14 }}>Categorías</h3>
+          <div className="card card-tight" style={{ position: "sticky", top: 88 }}>
+            <h3 className="h3" style={{ marginBottom: 16 }}>Categorías</h3>
             <ul className="stack" style={{ gap: 2 }}>
               <CategoryItem
                 label="Todas"

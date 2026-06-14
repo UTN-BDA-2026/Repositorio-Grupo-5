@@ -110,7 +110,7 @@ export default function OrderDetail() {
         ← Volver a órdenes
       </Link>
 
-      <div className="row-between" style={{ marginBottom: 24 }}>
+      <div className="row-between" style={{ marginBottom: 40 }}>
         <div className="stack">
           <span className="title-eyebrow">Orden <span className="mono">#{order.id}</span></span>
           <h1 className="h1">Detalle de compra</h1>
@@ -123,7 +123,7 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 32 }}>
+      <div className="grid-summary">
         <div className="stack-lg">
           <div className="card">
             <h3 className="h3" style={{ marginBottom: 16 }}>Items</h3>

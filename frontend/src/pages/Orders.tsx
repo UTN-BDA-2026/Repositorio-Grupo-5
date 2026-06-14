@@ -95,7 +95,7 @@ export default function Orders() {
 
   return (
     <div className="container page">
-      <div className="row-between" style={{ marginBottom: 24 }}>
+      <div className="row-between" style={{ marginBottom: 40 }}>
         <div className="stack">
           <span className="title-eyebrow">Historial</span>
           <h1 className="h1">Mis órdenes</h1>

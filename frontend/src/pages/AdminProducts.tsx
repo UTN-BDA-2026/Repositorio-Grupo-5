@@ -49,7 +49,7 @@ export default function AdminProducts() {
 
   return (
     <div className="container page">
-      <div className="row-between" style={{ marginBottom: 24 }}>
+      <div className="row-between" style={{ marginBottom: 40 }}>
         <div className="stack">
           <span className="title-eyebrow">Panel</span>
           <h1 className="h1">Admin · Productos</h1>
@@ -137,7 +137,7 @@ export default function AdminProducts() {
                     {p.category?.name ? (
                       <span className="badge">{p.category.name}</span>
                     ) : (
-                      <span className="faint">—</span>
+                      <span className="faint">Sin categoría</span>
                     )}
                   </td>
                   <td style={{ textAlign: "right", fontWeight: 600 }}>
