@@ -107,8 +107,8 @@ img { display: block; max-width: 100%; }
    long content doesn't blow out the grid horizontally. */
 .grid-sidebar {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 40px;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 48px;
 }
 .grid-summary {
   display: grid;
@@ -370,3 +370,42 @@ img { display: block; max-width: 100%; }
 
 /* ───────────────────── DIVIDER ───────────────────── */
 .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+/* ───────────────────── ANIMATIONS ───────────────────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+@keyframes float-slower {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50%      { transform: translateY(-10px) rotate(-3deg); }
+}
+@keyframes float-up-down {
+  0%, 100% { transform: translateY(6px) rotate(4deg); }
+  50%      { transform: translateY(-8px) rotate(4deg); }
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 var(--primary-ring); }
+  70%  { box-shadow: 0 0 0 14px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.anim-fade-up        { animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-fade-up-delay-1 { animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both; }
+.anim-fade-up-delay-2 { animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both; }
+.anim-fade-up-delay-3 { animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both; }
+.anim-fade-up-delay-4 { animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both; }
+.anim-float          { animation: float-slow 6s ease-in-out infinite; }
+.anim-float-slower   { animation: float-slower 7s ease-in-out infinite; }
+.anim-float-alt      { animation: float-up-down 7.5s ease-in-out infinite; }
+.anim-pulse-ring     { animation: pulse-ring 2.2s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade-up-delay-1, .anim-fade-up-delay-2,
+  .anim-fade-up-delay-3, .anim-fade-up-delay-4 { animation: none; }
+  .anim-float, .anim-float-slower, .anim-float-alt, .anim-pulse-ring { animation: none; }
+}

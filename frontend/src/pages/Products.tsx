@@ -104,8 +104,11 @@ export default function Products() {
       <div className="grid-sidebar">
         {/* SIDEBAR */}
         <aside>
-          <div className="card card-tight" style={{ position: "sticky", top: 88 }}>
-            <h3 className="h3" style={{ marginBottom: 16 }}>Categorías</h3>
+          <div
+            className="card"
+            style={{ position: "sticky", top: 88, padding: "20px 0" }}
+          >
+            <h3 className="h3" style={{ margin: "0 20px 16px" }}>Categorías</h3>
             <ul className="stack" style={{ gap: 2 }}>
               <CategoryItem
                 label="Todas"
@@ -212,13 +215,13 @@ function CategoryItem({
         onClick={onClick}
         style={{
           all: "unset",
+          boxSizing: "border-box",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           width: "100%",
-          padding: "8px 10px",
-          borderRadius: 8,
+          padding: "10px 20px",
           fontSize: 14,
           background: active ? "var(--primary-soft)" : "transparent",
           color: active ? "var(--primary-hover)" : "var(--text)",

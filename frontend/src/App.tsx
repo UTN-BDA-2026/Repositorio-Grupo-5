@@ -20,8 +20,8 @@ function Nav() {
   return (
     <header className="nav">
       <div className="nav-inner">
-        <Link to="/products" className="nav-brand">
-          Ecommerce<span className="nav-brand-dot">.</span>
+        <Link to="/" className="nav-brand">
+          Zentro Digital<span className="nav-brand-dot">.</span>
         </Link>
 
         <nav className="nav-links">
